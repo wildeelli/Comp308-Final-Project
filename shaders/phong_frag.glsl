@@ -1,11 +1,13 @@
 #version 440 core
 out vec3 color;
-//in vec3 fragmentColor;
 in vec3 normal_modelview;
 in vec3 vertex_modelview;
 in vec3 eye;
 
 in vec4 light_;
+
+uniform vec4 specular_colour;
+uniform vec3 diffuse_colour;
 
 void main(){
 	// color = vec3(1,0,0);
@@ -17,10 +19,12 @@ void main(){
 	float dist = length(L);
 	
 	float lambert = max(dot(L, N), 0.0);
-	vec3 diffuse = max(vec3(0.8), 1.0)*lambert;
-	float spec = pow(max(dot(R,E),0.0),.3*45);
-	vec3 specular = vec3(1.0) * spec;
+	vec3 diffuse = diffuse_colour *lambert;
+	float spec = pow(max(dot(R,E),0.0),.3*specular_colour.w);
+	vec3 specular = specular_colour.rgb * spec;
 	
-	color = diffuse + specular;
+	color = clamp(specular + diffuse, 0.0, 1.0);
+	//color = specular;
+	//color = diffuse;
 }
 
