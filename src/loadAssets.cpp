@@ -37,38 +37,27 @@ bool readOBJ(const char* path, std::vector<vec3> & vertices, std::vector<vec3> &
 		istringstream line (buf);
 		string token;
 		line >> token;
-//		cout << '<' << token << '>';
 		if (line.fail())
 			continue;
 		if (token[0]=='#') // is the line a comment
 			continue;
 		if (strcmp(token.c_str(), "v")==0){
-//			cout << token << endl;
 			vec3 vert;
 			line >> vert.x >> vert.y >> vert.z;
-//			cout << vert.x << vert.y << vert.z << endl;
 			v.push_back(vert);
 		} else if (strcmp(token.c_str(), "vn")==0){
-//			cout << token << endl;
 			vec3 norm;
 			line >> norm.x >> norm.y >> norm.z;
-//			cout << norm.x << norm.y << norm.z << endl;
 			n.push_back(norm);
 		} else if (strcmp(token.c_str(), "vt")==0){
-//			cout << token << endl;
 			vec2 text;
 			line >> text.s >> text.t;
-//			cout << text.s << text.t << endl;
 			t.push_back(text);
 		} else if (strcmp(token.c_str(), "f")==0){
-//			cout << token << endl;
 			string v1, v2, v3;
 			uint vind[3], texind[3], normind[3];
 			// and now i use scanf
 			line >> v1 >> v2 >> v3;
-//			getline(line, l);
-//			cout << count(l.begin(), l.end(), '/') << endl;
-//			cout << v1 << v2 << v3 << endl;
 			string l = v1+v2+v3;
 			int count = std::count(l.begin(), l.end(), '/');
 			if (count == 6){
