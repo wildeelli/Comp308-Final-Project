@@ -11,10 +11,12 @@
 #include <glm/glm.hpp>
 #include <vector>
 
-using namespace std;
-using namespace glm;
+//using namespace std;
+//using namespace glm;
 
-bool readOBJ(const char* path, vector<vec3> & vertices, vector<vec3> & normals, vector<vec2> & uvs);
+bool readOBJ(const char* path, std::vector<glm::vec3> & vertices, std::vector<glm::vec3> & normals, std::vector<glm::vec2> & uvs);
+bool readOBJ(const char* path, std::vector<glm::vec3> & vertices, std::vector<glm::vec3> & normals, std::vector<glm::vec2> & uvs, std::vector<glm::vec3> & pickcolours);
+
 
 
 
