@@ -10,7 +10,7 @@ SRC = ./src/
 
 all: $(BUILD)fp
 
-$(BUILD)fp: $(BUILD)loadShader.o $(BUILD)main.o $(BUILD)loadAssets.o 
+$(BUILD)fp: $(BUILD)loadShader.o $(BUILD)main.o $(BUILD)loadAssets.o $(BUILD)Triangle.o $(BUILD)Mesh.o
 	$(CC) -o $@ $^ -lm -lglfw3 -lopengl32 -lglu32 -lgdi32 -lglew32 $(LPATH) $(LDPATH)
 	
 $(BUILD)%.o:  $(SRC)%.cpp
