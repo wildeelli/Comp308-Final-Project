@@ -1,4 +1,9 @@
 #version 440 core
+
+
+
+flat in vec3 colour;
+
 out vec3 color;
 in vec3 normal_modelview;
 in vec3 vertex_modelview;
@@ -24,7 +29,7 @@ void main(){
 	vec3 specular = specular_colour.rgb * spec;
 	
 	color = clamp(specular + diffuse, 0.0, 1.0);
-	//color = specular;
-	//color = diffuse;
+	//color = colour;
+	//color = vec3(1.0);
 }
 

@@ -2,7 +2,8 @@
 // layout(location = 0) in vec3 vertexPosition_modelspace;
 layout(location=0) in vec3 vertexPosition_modelspace;
 layout(location=1) in vec3 normal_modelspace;
-layout(location=1) in vec2 uv_modelspace;
+//layout(location=2) in vec2 uv_modelspace;
+layout(location=3) in vec3 vertex_colour;
 
 
 uniform vec4 light;
@@ -20,6 +21,7 @@ out vec3 normal_modelview;
 out vec3 vertex_modelview;
 out vec3 eye;
 out vec4 light_;
+out vec3 colour;
 
 void main(){
 	// gl_Position.xyz = vertexPosition_modelspace;
@@ -29,7 +31,7 @@ void main(){
 	eye = -vertex_modelview; 
 	light_ = V*light;
 	//normal_modelview = normalize(V*M*vec4(normal_modelspace,0)).xyz;
-	
+	colour = vertex_colour;
 	gl_Position = P*V*M * vec4(vertexPosition_modelspace, 1.0);
 	// texcoord here?
 	
