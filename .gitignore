@@ -28,3 +28,10 @@
 *.app
 /.cproject
 /.project
+/build
+
+# cmake stuff
+/CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile
