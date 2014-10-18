@@ -64,7 +64,7 @@ void main(){
 	refraction = texture(cubemap, refraction).rgb;
 	
 	//color = clamp(normalize((vec3(spec)*diffuse)+specular),0.0, 1.0);
-	color = clamp(specular, 0.0, 1.0);
+	color = clamp(diffuse+specular, 0.0, 1.0);
 	vec3 solid = mix(diffuse+specular, reflection, 0.5);
 	//color = clamp(mix(solid, refraction, 0.5), 0.0, 1.0)
 	//R = reflect(I, N);;
