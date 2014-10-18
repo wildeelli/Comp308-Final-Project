@@ -18,17 +18,23 @@ uniform mat4 P;
 
 //out vec3 fragmentColor;
 out vec3 normal_modelview;
+//out vec3 normal_modelspace_;
 out vec3 vertex_modelview;
-out vec3 eye;
+out vec3 eye_dir;
+out vec3 eye_loc;
 out vec4 light_;
 out vec3 colour;
+flat out mat4 invertedCamera;
 
 void main(){
 	// gl_Position.xyz = vertexPosition_modelspace;
-	vertex_modelview = vec3(V*M*vec4(vertexPosition_modelspace, 1.0));
-	normal_modelview = (normalMatrix*vec4(normal_modelspace,0)).xyz; 
+	vertex_modelview = vec3(M*vec4(vertexPosition_modelspace, 1.0));
+	normal_modelview = vec3(normalMatrix*vec4(normal_modelspace,0.0));
+	//normal_modelspace_ = (M * vec4(normal_modelspace, 0.0)).xyz; 
 	//light_modelview = light_worldspace;
-	eye = -vertex_modelview; 
+	eye_loc = vec3( V * M * vec4(vertexPosition_modelspace, 1.0));
+	eye_dir = vec3( V * M * vec4(normal_modelspace, 0.0));
+	invertedCamera = mat4(inverse(mat3(V)));
 	light_ = V*light;
 	//normal_modelview = normalize(V*M*vec4(normal_modelspace,0)).xyz;
 	colour = vertex_colour;
