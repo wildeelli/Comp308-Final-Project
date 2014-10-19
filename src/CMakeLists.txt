@@ -3,7 +3,6 @@ SET(SOURCES
 	loadShader.cpp
 	main.cpp
 	HeightField.cpp
-	sphere.cpp
 	Mesh.cpp
 	
 )
