@@ -655,7 +655,7 @@ void display(){
 	specular = vec4(.08, .08, 0.8, 128);
 	glUniform4fv(specularColorID, 1, &specular[0]);
 	glBindVertexArray(cubevao[0]);
-	glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
+//	glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
 	glBindVertexArray(0);
 //	for (Triangle t: tri){
 //		t.draw();
