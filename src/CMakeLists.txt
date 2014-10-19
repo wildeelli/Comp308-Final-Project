@@ -2,12 +2,18 @@ SET(SOURCES
 	loadAssets.cpp
 	loadShader.cpp
 	main.cpp
+	HeightField.cpp
+	sphere.cpp
+	Mesh.cpp
 	
 )
 
 SET(HEADERS
 	loadAssets.hpp
 	loadShader.h
+	HeightField.h
+	Mesh.hpp
+	sphere.h
 )
 
 add_library(main ${SOURCES} ${HEADERS})

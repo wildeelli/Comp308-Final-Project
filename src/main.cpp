@@ -23,6 +23,8 @@
 #include "Triangle.hpp"
 #include <cstdlib>
 
+#include "HeightField.h"
+
 #include <cstring>
 #include <cstdio>
 #include <png.h>
@@ -45,6 +47,8 @@ void getVisible();
 void loadAssets();
 bool createFrameBuffer();
 bool createCubeMapTexture();
+void createFluidVBO();
+void updateFluidVBO();
 void renderCubeMap(vec3);
 void keyboardListener(GLFWwindow*, int, int, int, int);
 double lastframe;
@@ -61,7 +65,10 @@ GLuint detectionDepthBuffer;
 
 GLuint cubeTexture;
 GLuint cubeBuffer;
-GLint cubesize = 160;
+GLint cubesize = 640;
+
+GLuint skyboxTexture;
+GLuint skyboxBuffer;
 
 
 uint vaoID[1];
@@ -69,6 +76,11 @@ uint vboID[3];
 uint cubevao[1];
 uint cubevbo[3];
 int vcount[2], tcount[2], ncount[2];
+
+uint fluidvao[1];
+uint fluidvbo[2];
+uint fluidibo[1];
+uint fluidtris, fluidpoints;
 
 GLint ModelID;
 GLint ViewID ;
@@ -80,15 +92,19 @@ GLint specularColorID;
 GLint cameraPosID;
 
 bool go = false;
+bool lines = false;
+
+HeightField* sim;
+int gridsize = 64;
 
 std::vector<Triangle> tri;
 
 vec4 light(10.5, 10, 2, 1.0);
 //vec4 light(-8, 3, 3, 1.0);
 
-int loadCubeMapTexture(){
-	glGenTextures(1, &cubeTexture);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
+int loadSkyboxTexture(){
+	glGenTextures(1, &skyboxTexture);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
 
 	for (int i=0; i<6; ++i){
 		png_structp png_ptr;
@@ -189,6 +205,7 @@ int main(void){
 		printf("error code (a): {%d}\n", err);
 	}
 	loadAssets();
+
 	if (!createFrameBuffer()){
 		std::cout << "creating framebuffer failed" << std::endl;
 	}
@@ -225,12 +242,17 @@ int main(void){
 	// dump all the setup info to the console in case it crashes before stdout flushes, and so that eclipse actually shows me stuff
 	fflush(stdout);
 
+	sim = new HeightField(gridsize,0.99,-2);
+//	sim->push(5,5,1,2);
+	sim->update();
+	createFluidVBO();
+
 	double lastTime = glfwGetTime();
 	int nframes=0;
 
-//	if (!loadCubeMapTexture()){
-//		std::cout << "not loaded cube properly" << std::endl;
-//	}
+	if (!loadSkyboxTexture()){
+		std::cout << "not loaded cube properly" << std::endl;
+	}
 
 	while(!glfwWindowShouldClose(window))
 	{
@@ -244,9 +266,13 @@ int main(void){
 			nframes=0;
 			lastTime += .1;
 		}
+		if (go){
+			sim->update();
+			updateFluidVBO();
+		}
 
 		glfwGetFramebufferSize(window, &width, &height);
-		renderCubeMap(vec3(0,0,0));
+		renderCubeMap(vec3(gridsize/2.f,-5,gridsize/2.f));
 		display();
 //		getVisible();
 
@@ -334,6 +360,53 @@ bool createCubeMapTexture(){
 	//glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
 	return true;
+}
+
+void createFluidVBO(){
+
+	std::cout << "size: " << sizeof(*sim->triangles) << std::endl;
+
+	for (int i=0; i<2*(gridsize-1)*(gridsize-1); ++i){
+//		std::cout << " " << sim->points[sim->triangles[i].v1].x << " " << sim->points[sim->triangles[i].v1].y << " " << sim->points[sim->triangles[i].v1].z <<  " ";
+//		std::cout << " " << sim->normals[sim->triangles[i].v1].x << " " << sim->normals[sim->triangles[i].v1].y << " " << sim->normals[sim->triangles[i].v1].z << std::endl;
+	}
+
+	fflush(stdout);
+
+	glGenVertexArrays(1, &fluidvao[0]);
+	glBindVertexArray(fluidvao[0]);
+
+	glGenBuffers(2, fluidvbo);
+	glBindBuffer(GL_ARRAY_BUFFER, fluidvbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, gridsize*gridsize*3*sizeof(float), &sim->points[0], GL_STATIC_DRAW );
+	glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, fluidvbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, gridsize*gridsize*3*sizeof(float), &sim->normals[0], GL_STATIC_DRAW );
+	glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+
+	glGenBuffers(1, fluidibo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fluidibo[0]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 2*(gridsize-1)*(gridsize-1)*3*sizeof(uint), &sim->triangles[0], GL_STATIC_DRAW);
+	glBindVertexArray(0);
+
+
+}
+
+void updateFluidVBO(){
+	glBindVertexArray(fluidvao[0]);
+	glBindBuffer(GL_ARRAY_BUFFER, fluidvbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, gridsize*gridsize*3*sizeof(float), &sim->points[0], GL_STATIC_DRAW );
+	glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, fluidvbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, gridsize*gridsize*3*sizeof(float), &sim->normals[0], GL_STATIC_DRAW );
+	glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+	glBindVertexArray(0);
 }
 
 void loadAssets(){
@@ -472,7 +545,7 @@ void renderSkybox(mat4 p, mat4 v){
 	glUniformMatrix4fv(glGetUniformLocation(shadowmapshader, "P"), 1, GL_FALSE, &p[0][0]);
 	glUniform1i(glGetUniformLocation(shadowmapshader, "cubemap"), 0);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
 
 	glEnableVertexAttribArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, vbocube);
@@ -503,14 +576,14 @@ void display(){
 	glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
+//	glEnable(GL_CULL_FACE);
 	glUseProgram(phongshader);
 	mat4 ProjectionMatrix = perspective(45.0f, float(width) / float(height), 0.1f, 100.0f);;
 	mat4 ViewMatrix = lookAt(
-			vec3(3,2,3),
-			vec3(0,0,0),
-//			vec3(0,0,0),
-//			vec3(1,0,0),
+			vec3(-3,10,3),
+			vec3(5,0,-5),
+//			vec3(0,-5,0),
+//			vec3(1,-5,0),
 			vec3(0,1,0));
 //	ModelMatrix = scale(ModelMatrix, vec3(2));
 //	ViewMatrix = rotate(ViewMatrix, rot+= (go? frametime/2.:0.), normalize(vec3(0,1,0)));
@@ -529,28 +602,50 @@ void display(){
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
 //	glUniform1i(glGetUniformLocation(phongshader, "cubemap"), 0);
 	glDepthMask(false);
-//	renderSkybox(ProjectionMatrix, ViewMatrix);
+	renderSkybox(ProjectionMatrix, ViewMatrix);
 	glDepthMask(true);
 	glUseProgram(phongshader);
+
 	mat4 ModelMatrix = mat4(1.0);
+	ModelMatrix = translate(ModelMatrix, vec3(0,-5,0));
+	ModelMatrix = rotate(ModelMatrix, -1.570f, vec3(1, 0, 0));
 	glUniformMatrix4fv(ModelID, 1, GL_FALSE, &ModelMatrix[0][0]);
-//	ModelMatrix = rotate(ModelMatrix, rot*4, vec3(.707, 0 ,.707));
 	mat4 normalMatrix = transpose(inverse(ModelMatrix));
 	glUniformMatrix4fv(NormID, 1, GL_FALSE, &normalMatrix[0][0]);
 	vec4 diffuse = vec4(.8f, .8f, .8f, 1.f);
 	glUniform4fv(diffuseColorID, 1, &diffuse[0]);
 	vec4 specular = vec4(.6, 1., .6, 55);
 	glUniform4fv(specularColorID, 1, &specular[0]);
-	glBindVertexArray(vaoID[0]);
-	glDrawArrays(GL_TRIANGLES, 0, vcount[0]);
+//	glBindVertexArray(vaoID[0]);
+//	glDrawArrays(GL_TRIANGLES, 0, vcount[0]);
+	glGetError();
+	glBindVertexArray(fluidvao[0]);
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR){
+		std::cout << "errror " << err << " " <<  err << std::endl;
+	}
+//	glEnable(GL_PRIMITIVE_RESTART);
+
+	glDrawElements(
+			lines?GL_LINE_LOOP:GL_TRIANGLES,
+			3*2*(gridsize-1)*(gridsize-1),
+			GL_UNSIGNED_INT,
+			0);
+	err = glGetError();
+	if (err != GL_NO_ERROR){
+		std::cout << "error 2 " << err << " " <<  err << std::endl;
+	}
+//glDisable(GL_PRIMITIVE_RESTART);
 	glBindVertexArray(0);
+
 
 	glActiveTexture(0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
 	ModelMatrix = mat4(1.0);
+	ModelMatrix = translate(ModelMatrix, vec3(10, 0, -10));
 	ModelMatrix = rotate(ModelMatrix, rot+= (go? frametime/1.:0.), vec3(0,1,0));
-	ModelMatrix = translate(ModelMatrix, vec3(0, 0, 3));
+	ModelMatrix = translate(ModelMatrix, vec3(0, -3, 4));
 //	ModelMatrix = rotate(ModelMatrix, rot*4, vec3(.707, 0 ,.707));
 	glUniformMatrix4fv(ModelID, 1, GL_FALSE, &ModelMatrix[0][0]);
 	normalMatrix = transpose(inverse(ViewMatrix * ModelMatrix));
@@ -750,22 +845,20 @@ void renderCubeMap(vec3 position){
 		default:
 			break;
 		};
+		ViewMatrix = translate(ViewMatrix, -position);
 		glViewport(0, 0, cubesize, cubesize);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-//		err = glGetError();
-//		if (err!=GL_NO_ERROR){
-//			printf("error code mid (%d): {%d} {%s}\n", i, err, gluErrorString(err));
-//		}
-//		lookAt(
-//				vec3(3,4,3),
-//				vec3(0,0,0),
-//				vec3(0,1,0));
+		glDepthMask(false);
+//		renderSkybox(ProjectionMatrix, ViewMatrix);
+		glDepthMask(true);
+		glUseProgram(cubemapshader);
 		glUniformMatrix4fv(glGetUniformLocation(cubemapshader, "V"), 1, GL_FALSE, &ViewMatrix[0][0]);
 		glUniform4fv(glGetUniformLocation(cubemapshader, "light"),1 , &light[0]);
 
 		mat4 ModelMatrix = mat4(1.0);
+		ModelMatrix = translate(ModelMatrix, vec3(10, 0, -10));
 		ModelMatrix = rotate(ModelMatrix, rot, vec3(0,1,0));
-		ModelMatrix = translate(ModelMatrix, vec3(0, 0, 3));
+		ModelMatrix = translate(ModelMatrix, vec3(0, -3, 4));
 //		ModelMatrix = rotate(ModelMatrix, rot*4, vec3(.707, 0 ,.707));
 		glUniformMatrix4fv(glGetUniformLocation(cubemapshader, "M"), 1, GL_FALSE, &ModelMatrix[0][0]);
 		mat4 normalMatrix = transpose(inverse(ViewMatrix * ModelMatrix));
@@ -797,6 +890,15 @@ void keyboardListener(GLFWwindow* win, int key, int scancode, int action, int mo
 			break;
 		case GLFW_KEY_ESCAPE:
 			glfwSetWindowShouldClose(window, 1);
+			break;
+		case GLFW_KEY_L:
+			lines = ! lines;
+			break;
+		case GLFW_KEY_W:
+			sim->push(gridsize/2, gridsize/2, 4, 5);
+			break;
+		case GLFW_KEY_S:
+			sim->addSphere(gridsize/2, gridsize/2, 4, 3);
 			break;
 		default:
 			break;

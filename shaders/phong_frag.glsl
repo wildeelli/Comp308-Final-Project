@@ -28,56 +28,60 @@ void main(){
 	vec3 N = normalize(normal_modelview);
 	vec3 E = normalize(eye_dir);
 	vec3 I = normalize(eye_loc);
-	
-	
+
+
 	float dist = length(L);
 	L = normalize(L);
 	vec3 R = normalize(-reflect(L,N));
 	//float atten = 1.
-	
+
 	float lambert = max(dot(L, N), 0.0);
 	vec3 diffuse = diffuse_colour.rgb *lambert;
 	float spec = pow(max(dot(R,E),0.0),.3*specular_colour.w);
 	vec3 specular = specular_colour.rgb * spec;
-	
+
 	L = vec3((light2 - vec4(vertex_modelview,1.0)));
 	N = normalize(normal_modelview);
 	E = normalize(eye_dir);
-	
+
 	dist = length(L);
 	L = normalize(L);
 	R = normalize(-reflect(L,N));
 	//float atten = 1.
-	
+
 	lambert = max(dot(L, N), 0.0)*0.3;
 	diffuse += diffuse_colour.rgb *lambert;
 	spec = pow(max(dot(R,E),0.0),.3*specular_colour.w)*0.3;
 	specular += specular_colour.rgb * spec;
-	
+
 	N = normalize(eye_dir);
 	vec3 reflection =  (reflect(I, N));
 	reflection = vec3(invertedCamera * vec4(reflection, 0.0));
+	reflection = vec3(reflection.x, -reflection.yz);
 	reflection = texture(cubemap, reflection).rgb;
 	//vec3 refraction = texture(cubemap, refract(E, N, 1.333)).rgb;
 	vec3 refraction = refract(I, N, 1.0/1.3333);
+	refraction = vec3(refraction.x, -refraction.yz);
 	refraction = vec3(invertedCamera * vec4(refraction, 0.0));
 	refraction = texture(cubemap, refraction).rgb;
-	
+
 	//color = clamp(normalize((vec3(spec)*diffuse)+specular),0.0, 1.0);
 	color = clamp(diffuse+specular, 0.0, 1.0);
 	vec3 solid = mix(diffuse+specular, reflection, 0.5);
 	//color = clamp(mix(solid, refraction, 0.5), 0.0, 1.0)
 	//R = reflect(I, N);;
 	if (diffuse_colour.a > .9){
-	 //color = mix(texture(cubemap, refraction).rgb, texture(cubemap, reflection).rgb, 0.2);
+	 //color = mix(texture(cubemap, refraction).rgb, texture(cubemap, reflection).rgb, 0.5);
+	 //color = reflection;
 	 color = clamp(mix(solid, refraction, 0.5), 0.0, 1.0);
+	 //color = specular;
 	 //color = texture(cubemap, refraction).rgb;
 	 //color = (inverse (V) * vec4(reflect(I, N), 1.0)).rgb;
 	 //color =  (reflect(E, N));
 	 //color = normal_modelview;
 	 //color = refraction;
 	 }
-	//color = colour;
-	//color = vec3(1.0);
+	//color = normal_modelview;
+
 }
 

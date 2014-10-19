@@ -9,7 +9,7 @@ uniform mat4 P;
 out vec3 texcoords;
 
 void main(){
-	texcoords  = vertexPosition_modelspace;
+	texcoords  = vec3(vertexPosition_modelspace.x, -vertexPosition_modelspace.yz);
 	gl_Position = P*V * vec4 (vertexPosition_modelspace, 1.0);
 }
 

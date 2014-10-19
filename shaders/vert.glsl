@@ -30,7 +30,7 @@ void main(){
 	// gl_Position.xyz = vertexPosition_modelspace;
 	vertex_modelview = vec3(M*vec4(vertexPosition_modelspace, 1.0));
 	normal_modelview = vec3(normalMatrix*vec4(normal_modelspace,0.0));
-	//normal_modelspace_ = (M * vec4(normal_modelspace, 0.0)).xyz; 
+	//normal_modelspace_ = (M * vec4(normal_modelspace, 0.0)).xyz;
 	//light_modelview = light_worldspace;
 	eye_loc = vec3( V * M * vec4(vertexPosition_modelspace, 1.0));
 	eye_dir = vec3( V * M * vec4(normal_modelspace, 0.0));
@@ -40,5 +40,5 @@ void main(){
 	colour = vertex_colour;
 	gl_Position = P*V*M * vec4(vertexPosition_modelspace, 1.0);
 	// texcoord here?
-	
+
 }

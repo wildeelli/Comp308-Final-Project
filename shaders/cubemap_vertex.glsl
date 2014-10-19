@@ -18,8 +18,8 @@ out vec4 light_;
 
 void main(){
 	vertex_modelview = vec3(V*M*vec4(vertexPosition_modelspace, 1.0));
-	normal_modelview = (normalMatrix*vec4(normal_modelspace,0)).xyz; 
-	eye = -vertex_modelview; 
+	normal_modelview = (normalMatrix*vec4(normal_modelspace,0)).xyz;
+	eye = -vertex_modelview;
 	light_ = V*light;
 	//colour = vertex_colour;
 	gl_Position = P*V*M * vec4(vertexPosition_modelspace, 1.0);
