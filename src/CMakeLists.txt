@@ -15,7 +15,7 @@ SET(HEADERS
 	sphere.h
 )
 
-add_library(main ${SOURCES} ${HEADERS})
+#add_library(main ${SOURCES} ${HEADERS})
 
 list(APPEND LIBRARIES_impl glew ${GLEW_LIBRARIES} glfw ${GLFW_LIBRARIES} zlib png16_static)
 list(APPEND DEFINITIONS_impl ${GLEW_DEFINITIONS} ${ZLIB_DEFINITIONS})

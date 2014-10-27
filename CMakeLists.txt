@@ -28,7 +28,7 @@ set(ZLIB_LIBRARY zlib)
 
 # LibPNG
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/lpng1612")
-#include_directories("${PROJECT_SOURCE_DIR}/external/lpng1612")
+include_directories("${PROJECT_SOURCE_DIR}/external/lpng1612")
 
 # compiler flags 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -59,3 +59,5 @@ add_subdirectory(src)
 # set IDE display folders
 SET_PROPERTY(TARGET glfw PROPERTY FOLDER "ext")
 SET_PROPERTY(TARGET glew PROPERTY FOLDER "ext")
+SET_PROPERTY(TARGET zlib PROPERTY FOLDER "ext")
+SET_PROPERTY(TARGET png16 PROPERTY FOLDER "ext")
