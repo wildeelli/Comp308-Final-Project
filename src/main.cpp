@@ -43,14 +43,14 @@ GLint width=800, height=600;
 GLint dwidth=640, dheight=480;
 GLFWwindow* window;
 void display();
-void getVisible();
 void loadAssets();
 bool createFrameBuffer();
-bool createCubeMapTexture();
+GLuint createCubeMapTexture();
 void createFluidVBO();
 void updateFluidVBO();
 void renderCubeMap(vec3);
 void keyboardListener(GLFWwindow*, int, int, int, int);
+
 double lastframe;
 
 GLuint phongshader;
@@ -64,8 +64,8 @@ GLuint detectionTexture;
 GLuint detectionDepthBuffer;
 
 GLuint cubeTexture;
-GLuint cubeBuffer;
-GLint cubesize = 640;
+GLuint cubeTextureArray;
+GLint cubesize = 1600;
 
 GLuint skyboxTexture;
 GLuint skyboxBuffer;
@@ -80,7 +80,9 @@ int vcount[2], tcount[2], ncount[2];
 uint fluidvao[1];
 uint fluidvbo[2];
 uint fluidibo[1];
-uint fluidtris, fluidpoints;
+uint fluidTrisCount, fluidPointsCount;
+G308_Triangle* fluidTris;
+G308_Point* fluidPoints;
 
 GLint ModelID;
 GLint ViewID ;
@@ -90,6 +92,14 @@ GLint lightID;
 GLint diffuseColorID ;
 GLint specularColorID;
 GLint cameraPosID;
+
+GLfloat caretx = 5;
+GLfloat carety = 5;
+GLuint caretVao;
+GLint caretverts;
+
+float cameraRoty = 0;
+float cameraRotz = 0;
 
 bool go = false;
 bool lines = false;
@@ -103,8 +113,9 @@ vec4 light(10.5, 10, 2, 1.0);
 //vec4 light(-8, 3, 3, 1.0);
 
 int loadSkyboxTexture(){
-	glGenTextures(1, &skyboxTexture);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+	GLuint skybox;
+	glGenTextures(1, &skybox);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, skybox);
 
 	for (int i=0; i<6; ++i){
 		png_structp png_ptr;
@@ -174,7 +185,7 @@ int loadSkyboxTexture(){
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	return 1;
+	return skybox;
 }
 
 int main(void){
@@ -209,7 +220,7 @@ int main(void){
 	if (!createFrameBuffer()){
 		std::cout << "creating framebuffer failed" << std::endl;
 	}
-	createCubeMapTexture();
+	cubeTexture = createCubeMapTexture();
 
 	std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
 	phongshader = LoadShaders("shaders/vert.glsl", "shaders/phong_frag.glsl");
@@ -250,10 +261,10 @@ int main(void){
 	double lastTime = glfwGetTime();
 	int nframes=0;
 
-	if (!loadSkyboxTexture()){
+	if (!(skyboxTexture=loadSkyboxTexture())){
 		std::cout << "not loaded cube properly" << std::endl;
 	}
-
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	while(!glfwWindowShouldClose(window))
 	{
 		double ctime = glfwGetTime();
@@ -274,7 +285,6 @@ int main(void){
 		glfwGetFramebufferSize(window, &width, &height);
 		renderCubeMap(vec3(gridsize/2.f,-5,gridsize/2.f));
 		display();
-//		getVisible();
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -309,9 +319,10 @@ bool createFrameBuffer(){
 	return true;
 }
 
-bool createCubeMapTexture(){
-	glGenTextures(1, &cubeTexture);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
+GLuint createCubeMapTexture(){
+	GLuint cube;
+	glGenTextures(1, &cube);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cube);
 
 //	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BASE_LEVEL, 0);
 //	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, 0);
@@ -339,6 +350,7 @@ bool createCubeMapTexture(){
 //		}
 	}
 
+	GLuint cubeBuffer;
 	glGenFramebuffers(1, &cubeBuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, cubeBuffer);
 
@@ -350,7 +362,7 @@ bool createCubeMapTexture(){
 
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, cubeBuffer);
 
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, cubeTexture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, cube, 0);
 
 	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) return false;
 
@@ -359,12 +371,12 @@ bool createCubeMapTexture(){
 
 	//glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-	return true;
+	return cube;
 }
 
 void createFluidVBO(){
 
-	std::cout << "size: " << sizeof(*sim->triangles) << std::endl;
+//	std::cout << "size: " << sizeof(*sim->triangles) << std::endl;
 
 	for (int i=0; i<2*(gridsize-1)*(gridsize-1); ++i){
 //		std::cout << " " << sim->points[sim->triangles[i].v1].x << " " << sim->points[sim->triangles[i].v1].y << " " << sim->points[sim->triangles[i].v1].z <<  " ";
@@ -372,26 +384,31 @@ void createFluidVBO(){
 	}
 
 	fflush(stdout);
+	fluidTris = sim->triangles;
+	fluidPoints = sim->points;
+	fluidTrisCount = 2*(gridsize-1)*(gridsize-1)*3*sizeof(uint);
+	fluidPointsCount = gridsize*gridsize*3*sizeof(float);
 
 	glGenVertexArrays(1, &fluidvao[0]);
 	glBindVertexArray(fluidvao[0]);
 
 	glGenBuffers(2, fluidvbo);
 	glBindBuffer(GL_ARRAY_BUFFER, fluidvbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, gridsize*gridsize*3*sizeof(float), &sim->points[0], GL_STATIC_DRAW );
+	glBufferData(GL_ARRAY_BUFFER, fluidPointsCount, &sim->points[0], GL_STATIC_DRAW );
 	glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(0);
 
 	glBindBuffer(GL_ARRAY_BUFFER, fluidvbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, gridsize*gridsize*3*sizeof(float), &sim->normals[0], GL_STATIC_DRAW );
+	glBufferData(GL_ARRAY_BUFFER, fluidPointsCount, &sim->normals[0], GL_STATIC_DRAW );
 	glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(1);
 
 	glGenBuffers(1, fluidibo);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fluidibo[0]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 2*(gridsize-1)*(gridsize-1)*3*sizeof(uint), &sim->triangles[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, fluidTrisCount, &sim->triangles[0], GL_STATIC_DRAW);
 	glBindVertexArray(0);
 
+	std::cout << "size: " << sizeof(*fluidTris) << std::endl;
 
 }
 
@@ -413,7 +430,7 @@ void loadAssets(){
 	std::vector<vec3> v;
 	std::vector<vec3> n;
 	std::vector<vec2> t;
-	readOBJ("assets/sphere.obj", v,n, t);
+	readOBJ("assets/caret.obj", v,n, t);
 	std::cout<<v.size() << " " << n.size() << " " << t.size() << std::endl;
 	vcount[0] = v.size();
 	ncount[0] = n.size();
@@ -480,6 +497,32 @@ void loadAssets(){
 	glVertexAttribPointer((GLuint)3, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(3);
 	glBindVertexArray(0);
+
+	v.clear();
+	n.clear();
+	t.clear();
+
+	readOBJ("assets/caret3.obj", v, n, t);
+	std::cout << "Caret: " << v.size() << " " << n.size() << " " << t.size() << std::endl;
+	caretverts = v.size();
+	glGenVertexArrays(1, &caretVao);
+	glBindVertexArray(caretVao);
+	GLuint caretvbo[2];
+	glGenBuffers(2, caretvbo);
+
+	glBindBuffer(GL_ARRAY_BUFFER, caretvbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, caretverts*sizeof(vec3), &v[0], GL_STATIC_DRAW);
+	glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, caretvbo[1]);
+	glBufferData(GL_ARRAY_BUFFER, caretverts*sizeof(vec3), &n[0], GL_STATIC_DRAW);
+	glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+
+
 }
 
 float rot = 0;
@@ -487,47 +530,47 @@ float rot = 0;
 void renderSkybox(mat4 p, mat4 v){
 	glUseProgram(shadowmapshader);
 	GLfloat points[] = {
-	  -10.0f,  10.0f, -10.0f,
-	  -10.0f, -10.0f, -10.0f,
-	   10.0f, -10.0f, -10.0f,
-	   10.0f, -10.0f, -10.0f,
-	   10.0f,  10.0f, -10.0f,
-	  -10.0f,  10.0f, -10.0f,
+	  -1.0f,  1.0f, -1.0f,
+	  -1.0f, -1.0f, -1.0f,
+	   1.0f, -1.0f, -1.0f,
+	   1.0f, -1.0f, -1.0f,
+	   1.0f,  1.0f, -1.0f,
+	  -1.0f,  1.0f, -1.0f,
 
-	  -10.0f, -10.0f,  10.0f,
-	  -10.0f, -10.0f, -10.0f,
-	  -10.0f,  10.0f, -10.0f,
-	  -10.0f,  10.0f, -10.0f,
-	  -10.0f,  10.0f,  10.0f,
-	  -10.0f, -10.0f,  10.0f,
+	  -1.0f, -1.0f,  1.0f,
+	  -1.0f, -1.0f, -1.0f,
+	  -1.0f,  1.0f, -1.0f,
+	  -1.0f,  1.0f, -1.0f,
+	  -1.0f,  1.0f,  1.0f,
+	  -1.0f, -1.0f,  1.0f,
 
-	   10.0f, -10.0f, -10.0f,
-	   10.0f, -10.0f,  10.0f,
-	   10.0f,  10.0f,  10.0f,
-	   10.0f,  10.0f,  10.0f,
-	   10.0f,  10.0f, -10.0f,
-	   10.0f, -10.0f, -10.0f,
+	   1.0f, -1.0f, -1.0f,
+	   1.0f, -1.0f,  1.0f,
+	   1.0f,  1.0f,  1.0f,
+	   1.0f,  1.0f,  1.0f,
+	   1.0f,  1.0f, -1.0f,
+	   1.0f, -1.0f, -1.0f,
 
-	  -10.0f, -10.0f,  10.0f,
-	  -10.0f,  10.0f,  10.0f,
-	   10.0f,  10.0f,  10.0f,
-	   10.0f,  10.0f,  10.0f,
-	   10.0f, -10.0f,  10.0f,
-	  -10.0f, -10.0f,  10.0f,
+	  -1.0f, -1.0f,  1.0f,
+	  -1.0f,  1.0f,  1.0f,
+	   1.0f,  1.0f,  1.0f,
+	   1.0f,  1.0f,  1.0f,
+	   1.0f, -1.0f,  1.0f,
+	  -1.0f, -1.0f,  1.0f,
 
-	  -10.0f,  10.0f, -10.0f,
-	   10.0f,  10.0f, -10.0f,
-	   10.0f,  10.0f,  10.0f,
-	   10.0f,  10.0f,  10.0f,
-	  -10.0f,  10.0f,  10.0f,
-	  -10.0f,  10.0f, -10.0f,
+	  -1.0f,  1.0f, -1.0f,
+	   1.0f,  1.0f, -1.0f,
+	   1.0f,  1.0f,  1.0f,
+	   1.0f,  1.0f,  1.0f,
+	  -1.0f,  1.0f,  1.0f,
+	  -1.0f,  1.0f, -1.0f,
 
-	  -10.0f, -10.0f, -10.0f,
-	  -10.0f, -10.0f,  10.0f,
-	   10.0f, -10.0f, -10.0f,
-	   10.0f, -10.0f, -10.0f,
-	  -10.0f, -10.0f,  10.0f,
-	   10.0f, -10.0f,  10.0f
+	  -1.0f, -1.0f, -1.0f,
+	  -1.0f, -1.0f,  1.0f,
+	   1.0f, -1.0f, -1.0f,
+	   1.0f, -1.0f, -1.0f,
+	  -1.0f, -1.0f,  1.0f,
+	   1.0f, -1.0f,  1.0f
 	};
 	GLuint vbocube;
 	glGenBuffers (1, &vbocube);
@@ -546,7 +589,9 @@ void renderSkybox(mat4 p, mat4 v){
 	glUniform1i(glGetUniformLocation(shadowmapshader, "cubemap"), 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+//	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
 
+	glDisable(GL_DEPTH_TEST);
 	glEnableVertexAttribArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, vbocube);
 	glVertexAttribPointer(
@@ -559,8 +604,9 @@ void renderSkybox(mat4 p, mat4 v){
 	);
 
 	// Draw the triangles !
-	glDrawArrays(GL_TRIANGLES, 0, 36); // 2*3 indices starting at 0 -> 2 triangles
+	glDrawArrays(lines?GL_LINE_LOOP:GL_TRIANGLES, 0, 36); // 2*3 indices starting at 0 -> 2 triangles
 	glDisableVertexAttribArray(0);
+	glEnable(GL_DEPTH_TEST);
 }
 
 void display(){
@@ -580,31 +626,34 @@ void display(){
 	glUseProgram(phongshader);
 	mat4 ProjectionMatrix = perspective(45.0f, float(width) / float(height), 0.1f, 100.0f);;
 	mat4 ViewMatrix = lookAt(
-			vec3(-3,10,3),
-			vec3(5,0,-5),
+			vec3(-5,10,5),
+//			vec3(5,0,-5),
+			vec3((gridsize/2.)-(gridsize/4.), 0, -(gridsize/2.)+(gridsize/4.)),
 //			vec3(0,-5,0),
 //			vec3(1,-5,0),
 			vec3(0,1,0));
 //	ModelMatrix = scale(ModelMatrix, vec3(2));
 //	ViewMatrix = rotate(ViewMatrix, rot+= (go? frametime/2.:0.), normalize(vec3(0,1,0)));
 //	ViewMatrix = rotate(ViewMatrix, -(rot-1.57f), normalize(vec3(0,1,0)));
+	ViewMatrix = rotate(ViewMatrix, cameraRotz, vec3(0,1,0));
+	ViewMatrix = rotate(ViewMatrix, cameraRoty, normalize(vec3(0,0,1)));
 //	ViewMatrix = translate(ViewMatrix, vec3(0,0,5.19615));
 
 	glUniformMatrix4fv(ViewID, 1, GL_FALSE, &ViewMatrix[0][0]);
 	glUniformMatrix4fv(ProjID, 1, GL_FALSE, &ProjectionMatrix[0][0]);
 	glUniform4fv(lightID,1 , &light[0]);
-	vec3 camera = vec3(ViewMatrix * vec4(1,1,1,0));
+//	vec3 camera = vec3(ViewMatrix * vec4(1,1,1,0));
 //	std::cout << camera.x << " " << camera.y << " " << camera.z << std::endl;
 //	glUniform3fv(cameraPosID, 1, &camera[0]);
 
-	glUniform1i(glGetUniformLocation(phongshader, "cubemap"), 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
 //	glUniform1i(glGetUniformLocation(phongshader, "cubemap"), 0);
 	glDepthMask(false);
 	renderSkybox(ProjectionMatrix, ViewMatrix);
 	glDepthMask(true);
 	glUseProgram(phongshader);
+	glUniform1i(glGetUniformLocation(phongshader, "cubemap[0]"), 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeTexture);
 
 	mat4 ModelMatrix = mat4(1.0);
 	ModelMatrix = translate(ModelMatrix, vec3(0,-5,0));
@@ -643,7 +692,7 @@ void display(){
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
 	ModelMatrix = mat4(1.0);
-	ModelMatrix = translate(ModelMatrix, vec3(10, 0, -10));
+	ModelMatrix = translate(ModelMatrix, vec3(10, -5, -10));
 	ModelMatrix = rotate(ModelMatrix, rot+= (go? frametime/1.:0.), vec3(0,1,0));
 	ModelMatrix = translate(ModelMatrix, vec3(0, -3, 4));
 //	ModelMatrix = rotate(ModelMatrix, rot*4, vec3(.707, 0 ,.707));
@@ -652,10 +701,10 @@ void display(){
 	glUniformMatrix4fv(NormID, 1, GL_FALSE, &normalMatrix[0][0]);
 	diffuse = vec4(1., .2, .2, 0.f);
 	glUniform4fv(diffuseColorID, 1, &diffuse[0]);
-	specular = vec4(.08, .08, 0.8, 128);
+	specular = vec4(.08, .08, 0.08, 128);
 	glUniform4fv(specularColorID, 1, &specular[0]);
 	glBindVertexArray(cubevao[0]);
-//	glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
+	glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
 	glBindVertexArray(0);
 //	for (Triangle t: tri){
 //		t.draw();
@@ -664,104 +713,25 @@ void display(){
 
 //	glDrawArrays
 
-
-
-	lastframe = framestart;
-}
-
-void getVisible(){
-	double framestart = glfwGetTime();
-	double frametime = framestart-lastframe;
-	char cbuf[10];
-	sprintf(cbuf, "%.1f", 1./frametime);
-	glfwSetWindowTitle(window,cbuf);
-	glBindFramebuffer(GL_FRAMEBUFFER, detectionBuffer);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	int w, h;
-	glfwGetFramebufferSize(window, &w, &h);
-	glViewport(0,0,dwidth,dheight);
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-	glEnable(GL_DEPTH_TEST);
-	glUseProgram(isvisibleshader);
-	mat4 ProjectionMatrix = perspective(45.0f, float(w) / float(h), 0.1f, 100.0f);;
-	mat4 ViewMatrix = lookAt(
-		vec3(3,4,3),
-		vec3(0,0,0),
-		vec3(0,1,0));
-	glUniformMatrix4fv(glGetUniformLocation(isvisibleshader, "V"), 1, GL_FALSE, &ViewMatrix[0][0]);
-	glUniformMatrix4fv(glGetUniformLocation(isvisibleshader, "P"), 1, GL_FALSE, &ProjectionMatrix[0][0]);
-
-	mat4 ModelMatrix = mat4(1.0);
-	glUniformMatrix4fv(glGetUniformLocation(isvisibleshader, "M"), 1, GL_FALSE, &ModelMatrix[0][0]);
-	glBindVertexArray(vaoID[0]);
-	glDrawArrays(GL_TRIANGLES, 0, vcount[0]);
+	// drawing the position caret
+	// set the position of the caret
+	ModelMatrix = translate(mat4(1.0), vec3(caretx, -3, -carety));
+	normalMatrix = transpose(inverse(ViewMatrix * ModelMatrix));
+	glUniformMatrix4fv(ModelID, 1, GL_FALSE, &ModelMatrix[0][0]);
+	glUniformMatrix4fv(NormID, 1, GL_FALSE, &normalMatrix[0][0]);
+	// set the colour of the caret
+	diffuse = vec4(1.0, 0.3, 0.3, 0.f);
+	specular = vec4(.8, .7, .7, 64);
+	glUniform4fv(diffuseColorID, 1, &diffuse[0]);
+	glUniform4fv(specularColorID, 1, &specular[0]);
+	// draw the position of the caret
+	glBindVertexArray(caretVao);
+	glDrawArrays(GL_TRIANGLES, 0, caretverts);
 	glBindVertexArray(0);
 
 
-	ModelMatrix = mat4(1.0);
-	ModelMatrix = rotate(ModelMatrix, rot+=frametime, vec3(1,0,0));
-	ModelMatrix = translate(ModelMatrix, vec3(0, 0, 3));
-	ModelMatrix = rotate(ModelMatrix, rot*4, vec3(.707, 0 ,.707));
-	glUniformMatrix4fv(glGetUniformLocation(isvisibleshader, "M"), 1, GL_FALSE, &ModelMatrix[0][0]);
-	glBindVertexArray(cubevao[0]);
-	glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
-	glBindVertexArray(0);
 
 	lastframe = framestart;
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-//	glBindFramebuffer(GL_READ_FRAMEBUFFER, detectionBuffer);
-//	GLubyte* pixels = (GLubyte*)(malloc(3*w*h));//new GLubyte[w*h];
-//
-//	glReadPixels(0,0, dwidth, dheight, GL_RGB, GL_UNSIGNED_BYTE, pixels);
-	for (int i=2; i<dwidth*dheight; i+=3){
-//		cout << (int8_t)pixels[i-2] << " " << (int)pixels[i-1] << " " << (int)pixels[i] << endl;
-//		fflush(stdout);
-	}
-
-
-	/** Below here is me testing to see if it is drawing **/
-	glViewport(0,0,width,height);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-		glEnable(GL_DEPTH_TEST);
-	glUseProgram(shadowmapshader);
-
-	GLuint quad_VertexArrayID;
-	glGenVertexArrays(1, &quad_VertexArrayID);
-	glBindVertexArray(quad_VertexArrayID);
-
-	static const GLfloat g_quad_vertex_buffer_data[] = {
-	    -1.0f, -1.0f, 0.0f,
-	    1.0f, -1.0f, 0.0f,
-	    -1.0f,  1.0f, 0.0f,
-	    -1.0f,  1.0f, 0.0f,
-	    1.0f, -1.0f, 0.0f,
-	    1.0f,  1.0f, 0.0f,
-	};
-	GLuint quad_vertexbuffer;
-	glGenBuffers(1, &quad_vertexbuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(g_quad_vertex_buffer_data), g_quad_vertex_buffer_data, GL_STATIC_DRAW);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, detectionBuffer);
-	glUniform1i(glGetUniformLocation(shadowmapshader, "visibility"), 0);
-
-	glEnableVertexAttribArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-	glVertexAttribPointer(
-			0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
-			3,                  // size
-			GL_FLOAT,           // type
-			GL_FALSE,           // normalized?
-			0,                  // stride
-			(void*)0            // array buffer offset
-	);
-
-	// Draw the triangles !
-	glDrawArrays(GL_TRIANGLES, 0, 6); // 2*3 indices starting at 0 -> 2 triangles
-
-	glDisableVertexAttribArray(0);
-
 }
 
 void renderCubeMap(vec3 position){
@@ -803,60 +773,60 @@ void renderCubeMap(vec3 position){
 			ViewMatrix = lookAt(
 					vec3(0,0,0),
 					vec3(1,0,0),
-					vec3(0,-1,0));
-//			glClearColor(1, 0, 0, 1.0); //red
+					vec3(0,1,0));
+			glClearColor(1, 0, 0, 1.0); //red
 //			std::cout << "red" << std::endl;
 			break;
 		case 1:
 			ViewMatrix = lookAt(
 					vec3(0,0,0),
 					vec3(-1,0,0),
-					vec3(0,-1,0));
-//			glClearColor(0, 1, 0, 1.0); //green
+					vec3(0,1,0));
+			glClearColor(0, 1, 0, 1.0); //green
 			break;
 		case 2:
 			ViewMatrix = lookAt(
 					vec3(0,0,0),
-					vec3(0,1,0),
-					vec3(0,0,1));
-//			glClearColor(0, 0, 1, 1.0); //blue
+					vec3(0,-1,0),
+					vec3(0,0,-1));
+			glClearColor(0, 0, 1, 1.0); //blue
 			break;
 		case 3:
 			ViewMatrix = lookAt(
 					vec3(0,0,0),
-					vec3(0,-1,0),
-					vec3(0,0,-1));
-//			glClearColor(1, 1, 0, 1.0); //yellow
+					vec3(0,1,0),
+					vec3(0,0,1));
+			glClearColor(1, 1, 0, 1.0); //yellow
 			break;
 		case 4:
 			ViewMatrix = lookAt(
 					vec3(0,0,0),
-					vec3(0,0,1),
-					vec3(0,-1,0));
-//			glClearColor(0, 1, 1, 1.0); //light blue
+					vec3(0,0,-1),
+					vec3(0,1,0));
+			glClearColor(0, 1, 1, 1.0); //light blue
 			break;
 		case 5:
 			ViewMatrix = lookAt(
 					vec3(0,0,0),
-					vec3(0,0,-1),
-					vec3(0,-1,0));
-//			glClearColor(1, 0, 1, 1.0); //pink
+					vec3(0,0,1),
+					vec3(0,1,0));
+			glClearColor(1, 0, 1, 1.0); //pink
 			break;
 		default:
 			break;
 		};
-		ViewMatrix = translate(ViewMatrix, -position);
+//		ViewMatrix = translate(ViewMatrix, -position);
 		glViewport(0, 0, cubesize, cubesize);
 		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		glDepthMask(false);
-//		renderSkybox(ProjectionMatrix, ViewMatrix);
+		renderSkybox(ProjectionMatrix, ViewMatrix);
 		glDepthMask(true);
 		glUseProgram(cubemapshader);
 		glUniformMatrix4fv(glGetUniformLocation(cubemapshader, "V"), 1, GL_FALSE, &ViewMatrix[0][0]);
 		glUniform4fv(glGetUniformLocation(cubemapshader, "light"),1 , &light[0]);
 
 		mat4 ModelMatrix = mat4(1.0);
-		ModelMatrix = translate(ModelMatrix, vec3(10, 0, -10));
+		ModelMatrix = translate(ModelMatrix, vec3(10, -5, -10));
 		ModelMatrix = rotate(ModelMatrix, rot, vec3(0,1,0));
 		ModelMatrix = translate(ModelMatrix, vec3(0, -3, 4));
 //		ModelMatrix = rotate(ModelMatrix, rot*4, vec3(.707, 0 ,.707));
@@ -868,13 +838,29 @@ void renderCubeMap(vec3 position){
 		vec4 specular = vec4(.08, .08, 0.8, 128);
 		glUniform4fv(glGetUniformLocation(cubemapshader, "specular_colour"), 1, &specular[0]);
 		glBindVertexArray(cubevao[0]);
-		glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
+//		glDrawArrays(GL_TRIANGLES, 0, vcount[1]);
 		glBindVertexArray(0);
 //		err = glGetError();
 //		if (err!=GL_NO_ERROR){
 //			printf("error code end (%d): {%d} {%s}\n", i, err, gluErrorString(err));
 //		}
 
+
+		// drawing the position caret
+		// set the position of the caret
+		ModelMatrix = translate(mat4(1.0), vec3(caretx, 1, -carety));
+		normalMatrix = transpose(inverse(ViewMatrix * ModelMatrix));
+		glUniformMatrix4fv(glGetUniformLocation(cubemapshader, "M"), 1, GL_FALSE, &ModelMatrix[0][0]);
+		glUniformMatrix4fv(glGetUniformLocation(cubemapshader, "normalMatrix"), 1, GL_FALSE, &normalMatrix[0][0]);
+		// set the colour of the caret
+		diffuse = vec3(1.0, 0.3, 0.3);
+		specular = vec4(.8, .7, .7, 64);
+		glUniform3fv(glGetUniformLocation(cubemapshader, "diffuse_colour"), 1, &diffuse[0]);
+		glUniform4fv(glGetUniformLocation(cubemapshader, "specular_colour"), 1, &specular[0]);
+		// draw the position of the caret
+		glBindVertexArray(caretVao);
+		glDrawArrays(GL_TRIANGLES, 0, caretverts);
+		glBindVertexArray(0);
 	}
 
 
@@ -891,19 +877,48 @@ void keyboardListener(GLFWwindow* win, int key, int scancode, int action, int mo
 		case GLFW_KEY_ESCAPE:
 			glfwSetWindowShouldClose(window, 1);
 			break;
-		case GLFW_KEY_L:
+		case GLFW_KEY_Q:
 			lines = ! lines;
 			break;
 		case GLFW_KEY_W:
-			sim->push(gridsize/2, gridsize/2, 4, 5);
+//			sim->push(gridsize/2, gridsize/2, 4, 5);
+			sim->push(caretx, carety, 2, 2);
+			std::cout << caretx << " " << carety << std::endl;
 			break;
 		case GLFW_KEY_S:
-			sim->addSphere(gridsize/2, gridsize/2, 4, 3);
+//			sim->addSphere(gridsize/2, gridsize/2, 4, 3);
+			sim->addSphere(caretx, carety, 2, 2);
+			std::cout << caretx << " " << carety << std::endl;
+			break;
+		case GLFW_KEY_UP:
+			caretx ++;
+			break;
+		case GLFW_KEY_DOWN:
+			caretx --;
+			break;
+		case GLFW_KEY_LEFT:
+			carety ++;
+			break;
+		case GLFW_KEY_RIGHT:
+			carety --;
+			break;
+		case GLFW_KEY_I:
+			cameraRoty +=0.1;
+			break;
+		case GLFW_KEY_J:
+			cameraRotz -=0.1;
+			break;
+		case GLFW_KEY_K:
+			cameraRoty -=0.1;
+			break;
+		case GLFW_KEY_L:
+			cameraRotz +=0.1;
 			break;
 		default:
 			break;
 		}
 	}
+
 
 }
 

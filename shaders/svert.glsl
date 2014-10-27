@@ -10,7 +10,7 @@ out vec3 texcoords;
 
 void main(){
 	texcoords  = vec3(vertexPosition_modelspace.x, -vertexPosition_modelspace.yz);
-	gl_Position = P*V * vec4 (vertexPosition_modelspace, 1.0);
+	gl_Position = P*mat4(mat3(V)) * vec4 (vertexPosition_modelspace, 1.0);
 }
 
 //uniform mat4 depthMVP;

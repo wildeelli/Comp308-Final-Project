@@ -20,14 +20,16 @@ uniform vec4 diffuse_colour;
 //uniform vec3 camerapos;
 uniform mat4 V;
 
-uniform samplerCube cubemap;
+uniform samplerCube[] cubemap;
+uniform samplerCubeArray[] cubemaparray;
 
 void main(){
 	// color = vec3(1,0,0);
 	vec3 L = vec3((light_ - vec4(vertex_modelview,1.0)));
 	vec3 N = normalize(normal_modelview);
-	vec3 E = normalize(eye_dir);
 	vec3 I = normalize(eye_loc);
+	vec3 E = normalize(eye_dir);
+	E = normalize(vertex_modelview - eye_loc);
 
 
 	float dist = length(L);
@@ -42,7 +44,7 @@ void main(){
 
 	L = vec3((light2 - vec4(vertex_modelview,1.0)));
 	N = normalize(normal_modelview);
-	E = normalize(eye_dir);
+	//E = normalize(eye_dir);
 
 	dist = length(L);
 	L = normalize(L);
@@ -54,34 +56,36 @@ void main(){
 	spec = pow(max(dot(R,E),0.0),.3*specular_colour.w)*0.3;
 	specular += specular_colour.rgb * spec;
 
-	N = normalize(eye_dir);
-	vec3 reflection =  (reflect(I, N));
-	reflection = vec3(invertedCamera * vec4(reflection, 0.0));
+	//N = normalize(eye_dir);
+	vec3 reflection =  (reflect(E, N));
+	//reflection = vec3(invertedCamera * vec4(reflection, 0.0));
 	reflection = vec3(reflection.x, -reflection.yz);
-	reflection = texture(cubemap, reflection).rgb;
+	reflection = texture(cubemap[0], reflection).rgb;
 	//vec3 refraction = texture(cubemap, refract(E, N, 1.333)).rgb;
-	vec3 refraction = refract(I, N, 1.0/1.3333);
+	vec3 refraction = refract(E, N, 1.0/1.33333);
 	refraction = vec3(refraction.x, -refraction.yz);
-	refraction = vec3(invertedCamera * vec4(refraction, 0.0));
-	refraction = texture(cubemap, refraction).rgb;
+	//refraction = vec3(invertedCamera * vec4(refraction, 0.0));
+	refraction = texture(cubemap[0], refraction).rgb;
 
 	//color = clamp(normalize((vec3(spec)*diffuse)+specular),0.0, 1.0);
 	color = clamp(diffuse+specular, 0.0, 1.0);
 	vec3 solid = mix(diffuse+specular, reflection, 0.5);
 	//color = clamp(mix(solid, refraction, 0.5), 0.0, 1.0)
 	//R = reflect(I, N);;
+	//color = normalize(normal_modelview);
 	if (diffuse_colour.a > .9){
 	 //color = mix(texture(cubemap, refraction).rgb, texture(cubemap, reflection).rgb, 0.5);
-	 //color = reflection;
+	 color = reflection;
 	 color = clamp(mix(solid, refraction, 0.5), 0.0, 1.0);
 	 //color = specular;
 	 //color = texture(cubemap, refraction).rgb;
 	 //color = (inverse (V) * vec4(reflect(I, N), 1.0)).rgb;
-	 //color =  (reflect(E, N));
+	 //color =  (refract(E, N, 1.0/1.333));
 	 //color = normal_modelview;
-	 //color = refraction;
+	 //color = clamp(refraction- vec3(.50), 0.0, 1.0);
 	 }
-	//color = normal_modelview;
+	 //color = vec3(255.0/float(gl_PrimitiveID));
+	//color = (normal_modelview*2)+1.0;
 
 }
 

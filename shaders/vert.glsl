@@ -14,6 +14,8 @@ uniform mat4 M;
 uniform mat4 V;
 uniform mat4 P;
 
+//uniform vec3 camera;
+
 //uniform vec4 light_worldspace;
 
 //out vec3 fragmentColor;
@@ -32,8 +34,10 @@ void main(){
 	normal_modelview = vec3(normalMatrix*vec4(normal_modelspace,0.0));
 	//normal_modelspace_ = (M * vec4(normal_modelspace, 0.0)).xyz;
 	//light_modelview = light_worldspace;
-	eye_loc = vec3( V * M * vec4(vertexPosition_modelspace, 1.0));
+	//eye_loc = vec3( V * M * vec4(vertexPosition_modelspace, 1.0));
+	eye_loc = V[0].xyz;
 	eye_dir = vec3( V * M * vec4(normal_modelspace, 0.0));
+	//eye_dir = V[
 	invertedCamera = mat4(inverse(mat3(V)));
 	light_ = V*light;
 	//normal_modelview = normalize(V*M*vec4(normal_modelspace,0)).xyz;
